@@ -13,15 +13,18 @@ import tempfile
 import shutil
 # os for handling directory functions
 import os
+# for pyinstaller
+import sys
+
+# pyinstaller values
+nonbuffered_stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+sys.stdout = nonbuffered_stdout
 
 @Gooey(advanced=True,  
        program_name='Concat app',       
        program_description = 'Concatenates files',       
        default_size=(500, 350),   # starting size of the GUI
        )
-    
-
-
 def main():
     # creating the parser
     parser = GooeyParser(description='Concatenation app')
