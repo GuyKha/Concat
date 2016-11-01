@@ -4,7 +4,8 @@ from os import listdir
 from os.path import isfile, join, splitext
 # gooey for handling the gui
 from gooey import Gooey, GooeyParser
-# zip file for opening zip files
+# zip/gzip to handle opening and writing compressed files 
+import gzip
 import zipfile
 # temp file for opening temp directory
 import tempfile
@@ -17,9 +18,9 @@ import os
        program_name='Concat app',       
        program_description = 'Concatenates files',       
        default_size=(500, 350),   # starting size of the GUI
-       required_cols=1,           # number of columns in the "Required" section
-       optional_cols=1)
+       )
     
+
 
 def main():
     # creating the parser
@@ -27,20 +28,21 @@ def main():
     # adding the arguments
     parser.add_argument('inputDir',action='store',widget='DirChooser',help="The directory that contains the files to concatenate")
     parser.add_argument('outputName',action='store',help="The name of the output file")
+    #parser.add_argument('toCompress',action='store_false', widget='CheckBox',  help="Compress the output")
     #parser.add_argument('compress',action='store_true',widget='CheckBox',help='Compress')
     # parsing the arguments
     args = parser.parse_args()
     inputDir = args.inputDir
     outputName = args.outputName
+    toCompress = True
     #getting the list of files in the directory
     files = [f for f in listdir(inputDir) if isfile(join(inputDir, f))]
-    print 'files:', str(files).strip('[]')
+    print 'Files:', str(files).strip('[]')
     # getting the extensions of the files
     extensions = [splitext(f)[1] for f in files]
-    print 'extensions:', str(extensions).strip('[]')
    # checking if all file extension are equal to avoid errors
-    if (validate(extensions) == True):
-        print "Starting to Work"
+    if (validate(extensions) ):
+        print "Starting to Work..."
         # creating temp directory
         temp_dir = tempfile.mkdtemp()
         try:
@@ -54,51 +56,75 @@ def main():
                     zip_ref.extractall(temp_dir, members)
                     zip_ref.close()
                     print "Extracted: ",  str(members).strip('[]')
-                    decompressed = True # set decompress to true so concatenate will work on the temp_dir
-            if (extensions[0] == ".txt"):
-                decompressed = False
-                print ".txt file - no need to decompress moving on to concatenate"
-            
-            # concatenating the files in the temp directory
-            concatenate(temp_dir, outputName, inputDir , decompressed)
-            # compressing and moving to output directory
+                    decompress = True # set decompress to true so concatenate will work on the temp_dir
+                    # concatenating the files in the temp directory
+                concatenateAndCompress(temp_dir, outputName, inputDir , decompress,  toCompress)
+            elif (extensions[0] == ".gz"):
+                # getting the extension of the gzipped files expecting same extension
+                extension = splitext(splitext(files[0])[0])[1]
+                # concatenating the files since there is no need to decompress
+                # creating the empty outputgzip file to ensure the output is with the output name
+                with gzip.open(inputDir+"/" + outputName + extension  + '.gz', 'wb') as f:
+                    f.write("")
+                # concatenating the files
+                with open(inputDir+"/" + outputName + extension  + '.gz','ab') as wfp:
+                      for fn in files:
+                        with open(inputDir+"/" + fn, 'rb') as rfp:
+                          shutil.copyfileobj(rfp, wfp)
+                print "Finished creating concat file"
+            elif (extensions[0] == ".txt" or extensions[0] == '.fastq'):
+                decompress = False
+                print ".fastq/.txt files - no need to decompress moving on to concatenate"
+                # concatenating the files in the temp directory
+                concatenateAndCompress(temp_dir, outputName, inputDir , decompress,  toCompress)
         finally:
             # deleting the temp directory
             #shutil.rmtree(temp_dir)
-            print "delete"
+            print 'should uncomment deleting temp dir'
     else:
         print "Exiting..."
-    
-    print inputDir
 
 '''
 Concatenate the files inside the temp directory
 decompressed identify if the file is expected to be in temp_dir or in inputDir
 '''
-def concatenate(temp_dir, outputName, inputDir , decompressed):
-    # getting the extension
-    if (decompressed == True):
-        # running over all of the files in the temp dir and concatenating files saving the in the original directory
-        files = [f for f in listdir(temp_dir) if isfile(join(temp_dir, f))]
-        common_extension =  os.path.splitext(temp_dir+"/"+ files[0])[1]
-    else:
-        # running over all of the files in the temp dir and concatenating files saving the in the original directory
-        files = [f for f in listdir(inputDir) if isfile(join(inputDir, f))]
-        common_extension =  os.path.splitext(inputDir+"/"+ files[0])[1]
-    with open(temp_dir+"/"+ outputName + common_extension, 'wb') as outfile:
-        for filename in files:
-            if (decompressed == True):
-                with open(temp_dir+"/"+ filename, 'rb') as readfile:
-                    shutil.copyfileobj(readfile, outfile)
-            else:
-                with open(inputDir+"/"+ filename, 'rb') as readfile:
-                    shutil.copyfileobj(readfile, outfile)
+def concatenateAndCompress(temp_dir, outputName, inputDir , decompress,  toCompress):
+    # getting the working dir according to the state of the files (already decompressED or needed to be decompressed
+    if (decompress == True):
+        workingDir = temp_dir
+    else: 
+        workingDir = inputDir
+    # running over all of the files in the temp dir and concatenating files saving the in the original directory
+    files = [f for f in listdir(workingDir) if isfile(join(workingDir, f))]
+    # getting the extensions of the files
+    extensions = [splitext(f)[1] for f in files]
+    if (validate(extensions)):
+        common_extension =  os.path.splitext(files[0])[1]
+        print "ext: " , common_extension
+        # concatenating the files
+        with open(workingDir+"/"+ outputName + common_extension, 'wb') as concatFile:
+            for filename in files:
+                with open(workingDir+"/"+ filename, 'rb') as readfile:
+                    shutil.copyfileobj(readfile, concatFile)
+        # compress if compressing is needed
+        if (toCompress):
+            print "Compressing to gzip"
+            #compressing output file
+            with open(workingDir+"/"+ outputName + common_extension, 'rb') as f_in,  gzip.open(inputDir+"/" + outputName + common_extension + '.gz', 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+            # deleting the concat file
+            os.remove(workingDir+"/"+ outputName + common_extension)
+            print "Finished Creating",  outputName,  '.gz'
+        else:
+            print "Finished creating concat file"
+        
+                    
 
 # function that checks if all the values in list are equal
 def validate(items): 
     # the list of values that are accepted
     result = True # will save the result of the function
-    acceptedExt = ['.txt', '.fastq', '.zip', '.gzip']
+    acceptedExt = ['.txt', '.fastq', '.zip', '.gz']
     # Check if all items extension are equal
     if(not all(x == items[0] for x in items)):
         print "Not all files are equal"
