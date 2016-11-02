@@ -27,16 +27,18 @@ sys.stdout = nonbuffered_stdout
        )
 def main():
     # creating the parser
-    parser = GooeyParser(description='Concatenation app')
+    parser = GooeyParser(description='Concatenation app concatenates .txt,.fastq,.zip, and .gz files')
     # adding the arguments
-    parser.add_argument('inputDir',action='store',widget='DirChooser',help="The directory that contains the files to concatenate")
-    parser.add_argument('outputName',action='store',help="The name of the output file")
-    #parser.add_argument('toCompress',action='store_false', widget='CheckBox',  help="Compress the output")
-    #parser.add_argument('compress',action='store_true',widget='CheckBox',help='Compress')
+    parser.add_argument('inputDir',action='store',widget='DirChooser',help="The directory that contains the files to concatenate \
+                                (Note: all files should have the same extension and valid extension,\
+                                in case of zip the files inside all of the zips should have the same extension")
+    parser.add_argument('outputName',action='store',widget='TextField' ,help="The name of the output file without the suffix")
+    #parser.add_argument('toCompress',action='store', widget='CheckBox',  help="Compress the output")
     # parsing the arguments
     args = parser.parse_args()
     inputDir = args.inputDir
     outputName = args.outputName
+    #toCompress = args.toCompress
     toCompress = True
     #getting the list of files in the directory
     files = [f for f in listdir(inputDir) if isfile(join(inputDir, f))]
@@ -78,7 +80,7 @@ def main():
             elif (extensions[0] == ".txt" or extensions[0] == '.fastq'):
                 decompress = False
                 print ".fastq/.txt files - no need to decompress moving on to concatenate"
-                # concatenating the files in the temp directory
+                # concatenating the files in the temp directory and compressing
                 concatenateAndCompress(temp_dir, outputName, inputDir , decompress,  toCompress)
         finally:
             # deleting the temp directory
@@ -88,8 +90,9 @@ def main():
         print "Exiting..."
 
 '''
-Concatenate the files inside the temp directory
-decompressed identify if the file is expected to be in temp_dir or in inputDir
+Concatenate the files inside the temp directory and compressing if needed
+decompressed - True if the files are expected to be in temp_dir otherwise in inputDir (since there is no need to decompress)
+toCompress - True if the concatenate file will be compressed
 '''
 def concatenateAndCompress(temp_dir, outputName, inputDir , decompress,  toCompress):
     # getting the working dir according to the state of the files (already decompressED or needed to be decompressed
@@ -123,17 +126,19 @@ def concatenateAndCompress(temp_dir, outputName, inputDir , decompress,  toCompr
         
                     
 
-# function that checks if all the values in list are equal
-def validate(items): 
+'''
+Validate that all of the extensions are the same and that they are of the type: '.txt', '.fastq', '.zip', '.gz'
+'''
+def validate(extensions): 
     # the list of values that are accepted
     result = True # will save the result of the function
     acceptedExt = ['.txt', '.fastq', '.zip', '.gz']
     # Check if all items extension are equal
-    if(not all(x == items[0] for x in items)):
+    if(not all(x == extensions[0] for x in extensions)):
         print "Not all files are equal"
         result = False
     # Check if all items extensions are valid
-    if (not all(x in acceptedExt for x in items)):
+    if (not all(x in acceptedExt for x in extensions)):
         print 'Not all items are with acceptable extension.'
         print 'acceptable extensions are:', str(acceptedExt).strip('[]')
         result = False
