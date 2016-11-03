@@ -13,12 +13,6 @@ import tempfile
 import shutil
 # os for handling directory functions
 import os
-# for pyinstaller
-import sys
-
-# pyinstaller values
-nonbuffered_stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
-sys.stdout = nonbuffered_stdout
 
 @Gooey(advanced=True,  
        program_name='Concat app',       
@@ -33,13 +27,11 @@ def main():
                                 (Note: all files should have the same extension and valid extension,\
                                 in case of zip the files inside all of the zips should have the same extension")
     parser.add_argument('outputName',action='store',widget='TextField' ,help="The name of the output file without the suffix")
-    #parser.add_argument('toCompress',action='store', widget='CheckBox',  help="Compress the output")
     # parsing the arguments
     args = parser.parse_args()
     inputDir = args.inputDir
     outputName = args.outputName
-    #toCompress = args.toCompress
-    toCompress = True
+    toCompress=True;
     #getting the list of files in the directory
     files = [f for f in listdir(inputDir) if isfile(join(inputDir, f))]
     print 'Files:', str(files).strip('[]')
@@ -84,8 +76,7 @@ def main():
                 concatenateAndCompress(temp_dir, outputName, inputDir , decompress,  toCompress)
         finally:
             # deleting the temp directory
-            #shutil.rmtree(temp_dir)
-            print 'should uncomment deleting temp dir'
+            shutil.rmtree(temp_dir)
     else:
         print "Exiting..."
 
